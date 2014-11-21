@@ -1,4 +1,4 @@
-JavaProject
+JavaChat
 ===========
 
- My first repository on GitHub as a mentee
+Simple Java Chat that allows you to communicate with multiple clients in the same network.
