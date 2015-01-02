@@ -1,4 +1,4 @@
-package ro.julymp.chat;
+package ro.julymp.chat.message;
 
 import java.io.Serializable;
 
@@ -9,14 +9,16 @@ import java.io.Serializable;
 
 public class Message implements Serializable{
 
+    private static final long serialVersionUID = -5613561445539455194L;
     //protocol that identifies the type of the message and its structure
     private Protocol protocol;
     //message sent according to the protocol
-    private String message;
+    private String payload;
+    
     
     public Message(Protocol protocol, String message){
 	this.protocol = protocol;
-	this.message = message;
+	this.payload = message;
     }
     
     public Message(Protocol protocol){
@@ -31,11 +33,11 @@ public class Message implements Serializable{
         this.protocol = protocol;
     }
 
-    public String getMessage() {
-        return message;
+    public String getPayload() {
+        return payload;
     }
 
-    public void setMessage(String message) {
-        this.message = message;
+    public void setPayload(String message) {
+        this.payload = message;
     }
 }

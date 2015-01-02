@@ -1,4 +1,4 @@
-package ro.julymp.chat;
+package ro.julymp.chat.message;
 
 /**
  * A set of values to identify the type of the message
@@ -11,6 +11,10 @@ public enum Protocol {
     IDENTIFY, 
     //the list of the clients
     GET_USERS, 
+    //new connected client
+    CONNECTED,
+    //disconnected client
+    DISCONNECTED,
     //message to be send
     SEND_MESSAGE
     
