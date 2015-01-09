@@ -28,12 +28,10 @@ public class Server implements Runnable {
 		    while (true) {
 			Socket clientSocket;
 			try {
-			    System.out
-				    .println("SERVER: waiting for client connection...");
+			    System.out.println("SERVER: waiting for client connection...");
 			    clientSocket = serverSocket.accept();
 			    System.out.println("SERVER: client connected.");
-			    ClientListener clientListener = new ClientListener(
-				    clientSocket);
+			    ClientListener clientListener = new ClientListener(clientSocket);
 			    new Thread(clientListener).start();
 			} catch (IOException e) {
 			    e.printStackTrace();
@@ -55,8 +53,7 @@ public class Server implements Runnable {
 	startServer();
     }
 
-    public synchronized void addClient(String username,
-	    ClientListener clientListener) {
+    public synchronized void addClient(String username, ClientListener clientListener) {
 	clients.put(username, clientListener);
     }
 
@@ -74,15 +71,14 @@ public class Server implements Runnable {
     }
 
     public synchronized void sendDisconnectedMessage(String username) {
-	Message disconnectedMassage = new Message(Protocol.DISCONNECTED,
-		username);
+	Message disconnectedMassage = new Message(Protocol.DISCONNECTED, username);
 	removeClient(username);
 	for (Entry<String, ClientListener> entry : clients.entrySet()) {
 	    if (!entry.getKey().equals(username)) {
 		entry.getValue().sendMessage(disconnectedMassage);
 	    }
 	}
-	
+
     }
 
     private class ClientListener implements Runnable {
@@ -118,7 +114,7 @@ public class Server implements Runnable {
 		sendDisconnectedMessage(username);
 		return null;
 	    }
-	    
+
 	}
 
 	@Override
@@ -131,21 +127,34 @@ public class Server implements Runnable {
 		    switch (message.getProtocol()) {
 		    case IDENTIFY:
 			String username = message.getPayload();
-			sendConnectedMessage(username);
-			addClient(username, this);
-			this.username = username;
-			System.out.println("Client " + username
-				+ " is now connected.");
-			break;
+			if (!clients.containsKey(username)) {
+			    sendConnectedMessage(username);
+			    addClient(username, this);
+			    this.username = username;
+			    System.out.println("Client " + username + " is now connected.");
+			    break;
+			} else {
+			    sendMessage(new Message(Protocol.INVALID));
+			    return;
+			}
+
 		    case GET_USERS:
-			List<String> users = new ArrayList<String>(
-				clients.size());
+			List<String> users = new ArrayList<String>(clients.size());
 			users.addAll(clients.keySet());
 			message.setPayload(users.toString());
 			sendMessage(message);
 			break;
+		    case SEND_MESSAGE:
+			// [receiver]message
+			String receiver = message.getPayload().substring(1, message.getPayload().indexOf("]"));
+			String mess = message.getPayload().substring(message.getPayload().indexOf("]") + 1);
+			clients.get(receiver).sendMessage(new Message(Protocol.SEND_MESSAGE, "[" + this.username + "]" + mess));
+			break;
+		    case DISCONNECTED:
+			sendDisconnectedMessage(this.username);
+			break;
 		    default:
-			System.out.println(message.getProtocol() + ":" +message.getPayload());
+			System.out.println(message.getProtocol() + ":" + message.getPayload());
 			break;
 		    }
 		} else {

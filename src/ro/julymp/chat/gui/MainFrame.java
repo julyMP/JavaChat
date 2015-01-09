@@ -12,6 +12,7 @@ import java.awt.event.ActionListener;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import javax.swing.BorderFactory;
@@ -28,13 +29,17 @@ import javax.swing.JTextArea;
 import javax.swing.JTextField;
 import javax.swing.SwingUtilities;
 
+import ro.julymp.chat.Client;
+import ro.julymp.chat.ClientAction;
+import ro.julymp.chat.message.Message;
+import ro.julymp.chat.message.Protocol;
 import static java.awt.GridBagConstraints.*;
 
 /**
  * @author Marius-Pop Iuliana Dec 21, 2014
  */
 
-public class MainFrame extends JFrame {
+public class MainFrame extends JFrame implements ClientAction {
 
     private JTextField serverIP = new JTextField(15);
     private JTextField serverPort = new JTextField(5);
@@ -47,6 +52,8 @@ public class MainFrame extends JFrame {
     private JButton send = new JButton("Send");
     private boolean isConnectVisible = true;
     private Map<String, JTextArea> chatTabTextAreaMap = new HashMap<String, JTextArea>();
+    private Client client;
+    
     public MainFrame() {
 	initGUI();
     }
@@ -72,6 +79,19 @@ public class MainFrame extends JFrame {
 		}
 	    }
 	});
+	this.send.addActionListener(new ActionListener() {
+
+	    @Override
+	    public void actionPerformed(ActionEvent e) {
+		String mess = message.getText();
+		putMessage(mess);
+		message.setText(null);
+
+	    }
+
+	});
+	this.serverIP.setText("127.0.0.1");
+	this.serverPort.setText("12345");
 	this.setVisible(true);
     }
 
@@ -89,9 +109,8 @@ public class MainFrame extends JFrame {
 		if (p < 1 || p > 65000) {
 		    showErrorDialog("Invalid port!");
 		}
-		addUser(username);
-		connect.setText("Disconnect");
-		isConnectVisible = false;
+		this.client = new Client(username, ip, p, this);
+		new Thread(client).start();
 	    } catch (NumberFormatException e) {
 		showErrorDialog("Invalid port!");
 	    }
@@ -100,13 +119,21 @@ public class MainFrame extends JFrame {
     }
 
     private void disconnect() {
-
+	this.client.sendMessage(new Message(Protocol.DISCONNECTED));
 	connect.setText("Connect");
 	isConnectVisible = true;
+	serverIP.setEnabled(true);
+	serverPort.setEnabled(true);
+	username.setEnabled(true);
+	usersListModel.removeAllElements();
     }
 
     private void addUser(String user) {
 	usersListModel.addElement(user);
+    }
+
+    private void removeUser(String user) {
+	usersListModel.removeElement(user);
     }
 
     private JPanel getTopPanel() {
@@ -172,8 +199,8 @@ public class MainFrame extends JFrame {
 	return panel;
     }
 
-    private void addTab(String user){
-	if(!chatTabTextAreaMap.containsKey(user)){
+    private void addTab(String user) {
+	if (!chatTabTextAreaMap.containsKey(user)) {
 	    JTextArea textArea = new JTextArea();
 	    textArea.setEditable(false);
 	    chatTabTextAreaMap.put(user, textArea);
@@ -181,12 +208,11 @@ public class MainFrame extends JFrame {
 	    chatTabs.setSelectedIndex(chatTabs.getTabCount() - 1);
 	}
     }
-    
-    private void removeTab(String user){
+
+    private void removeTab(String user) {
 	chatTabTextAreaMap.remove(user);
     }
-    
-    
+
     private JPanel getBottomPanel() {
 	JPanel panel = new JPanel();
 	panel.setBorder(BorderFactory.createEtchedBorder());
@@ -198,11 +224,67 @@ public class MainFrame extends JFrame {
 	return panel;
     }
 
+    private void putMessage(String message) {
+	String selectedTabTitle = chatTabs.getTitleAt(chatTabs.getSelectedIndex());
+	this.client.sendMessage(new Message(Protocol.SEND_MESSAGE, "["+selectedTabTitle+"]"+message));
+	putMessage(message, selectedTabTitle, this.username.getText());
+    }
+
+    private void putMessage(String message, String tabTitle, String sender) {
+	JTextArea textArea = chatTabTextAreaMap.get(tabTitle);
+	if (!message.isEmpty()) {
+	    textArea.append(sender + ":" + message + "\n");
+	}
+    }
+
     public void showErrorDialog(String message) {
 	JOptionPane.showMessageDialog(this, message, "Error", JOptionPane.ERROR_MESSAGE);
     }
 
     public static void main(String[] args) {
 	MainFrame mainFrame = new MainFrame();
+    }
+
+    @Override
+    public void getUsers(List<String> users) {
+	for (String user : users) {
+	    addUser(user);
+	}
+
+    }
+
+    @Override
+    public void connect(String user) {
+	addUser(user);
+
+    }
+
+    @Override
+    public void disconnect(String user) {
+	removeUser(user);
+    }
+
+    @Override
+    public void receiveMessage(String sender, String message) {
+	if (!chatTabTextAreaMap.containsKey(sender)) {
+	    addTab(sender);
+	}
+	putMessage(message,sender,sender);
+    }
+
+    @Override
+    public void onExeption(Exception e) {
+	showErrorDialog(e.getMessage());
+	disconnect();
+    }
+
+    @Override
+    public void afterStart() {
+	connect.setText("Disconnect");
+	isConnectVisible = false;
+	serverIP.setEnabled(false);
+	serverPort.setEnabled(false);
+	username.setEnabled(false);
+	this.client.sendMessage(new Message(Protocol.GET_USERS,""));
     }
 }

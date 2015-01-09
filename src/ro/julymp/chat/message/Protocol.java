@@ -16,6 +16,8 @@ public enum Protocol {
     //disconnected client
     DISCONNECTED,
     //message to be send
-    SEND_MESSAGE
+    SEND_MESSAGE,
+    //invalid connection(same username)
+    INVALID
     
 }

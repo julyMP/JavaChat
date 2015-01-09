@@ -23,10 +23,17 @@ public class Client implements Runnable {
     private ObjectOutputStream out;
     private ObjectInputStream in;
 
+    ClientAction clientAction;
+    
     public Client(String username, String host, int port) {
 	this.userName = username;
 	this.host = host;
 	this.port = port;
+    }
+    
+    public Client(String username, String host, int port, ClientAction clientAction) {
+	this(username, host, port);
+	this.clientAction = clientAction;
     }
 
     public String getUserName() {
@@ -37,38 +44,57 @@ public class Client implements Runnable {
 	this.userName = userName;
     }
 
+    public ClientAction getClientAction() {
+        return clientAction;
+    }
+
+    public void setClientAction(ClientAction clientAction) {
+        this.clientAction = clientAction;
+    }
+    
     public void sendMessage(Message message) {
 	try {
 	    out.writeObject(message);
 	} catch (IOException e) {
-	    e.printStackTrace();
+	    if(this.clientAction != null){
+		this.clientAction.onExeption(e);
+	    }
 	}
     }
 
+    
+    
     public Message getMessage() {
 	try {
 	    Object object = in.readObject();
-	    if(object instanceof Message){
-		return (Message)object;
+	    if (object instanceof Message) {
+		return (Message) object;
 	    }
-	}catch (Exception e){
+	} catch (Exception e) {
 	    return null;
 	}
-	
+
 	return null;
     }
 
     @Override
-    public void run() {
+    public void run(){
 	try {
 	    this.socket = new Socket(host, port);
 	    this.out = new ObjectOutputStream(socket.getOutputStream());
 	    this.out.flush();
 	    this.in = new ObjectInputStream(socket.getInputStream());
+	    if(this.clientAction != null){
+		this.clientAction.afterStart();
+	    }
 	} catch (UnknownHostException e) {
-	    e.printStackTrace();
+	    if(this.clientAction != null){
+		this.clientAction.onExeption(e);
+	    }
 	} catch (IOException e) {
-	    e.printStackTrace();
+	    if(this.clientAction != null){
+		this.clientAction.onExeption(e);
+	    }
 	}
 	while (true) {
 	    Message message = getMessage();
@@ -76,30 +102,58 @@ public class Client implements Runnable {
 		switch (message.getProtocol()) {
 		case IDENTIFY:
 		    sendMessage(new Message(Protocol.IDENTIFY, this.userName));
-		    sendMessage(new Message(Protocol.GET_USERS));
 		    break;
+		case INVALID:
+		    if(this.clientAction != null){
+			this.clientAction.onExeption(new Exception("Invalid user"));
+		    }
+		    return;
 		case GET_USERS:
 		    String usersNameList = message.getPayload();
-        	    System.out.println("Connected users: " +usersNameList);
+		    List<String> users = parseUsersList(usersNameList);
+		    if(this.clientAction != null){
+			this.clientAction.getUsers(users);
+		    }
 		    break;
 		case CONNECTED:
-		    System.out.println("New Client connected: "
-			    + message.getPayload());
+		    if(this.clientAction != null){
+			this.clientAction.connect(message.getPayload());
+		    }
 		    break;
 		case DISCONNECTED:
-		    System.out.println("Client "
-			    + message.getPayload() + " was disconnected.");
+		    if(this.clientAction != null){
+			this.clientAction.disconnect(message.getPayload());
+		    }
 		    break;
+		case SEND_MESSAGE:
+		    String sender = message.getPayload().substring(1,message.getPayload().indexOf("]"));
+	            String mess = message.getPayload().substring(message.getPayload().indexOf("]") + 1);
+	            if(this.clientAction != null){
+			this.clientAction.receiveMessage(sender, mess);
+		    }
+	            break;
 		default:
 		    System.out.println("CLIENT message: " + message.getProtocol() + ": " + message.getPayload());
 		    break;
 		}
-	    }else{
+	    } else {
 		System.out.println("Server down: " + this.userName);
 		break;
 	    }
 
 	}
+    }
+
+    private List<String> parseUsersList(String users) {
+	List<String> usersList = new ArrayList<String>();
+        //[jjjjj,jjjkkjn,kiouh]
+	String[] parts = users.split("[\\[\\],]");
+	for(String part:parts){
+	    if(part!=null && !part.isEmpty()){
+		usersList.add(part.trim());
+	    }
+	}
+	return usersList;
     }
 
 }
